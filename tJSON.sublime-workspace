@@ -1,0 +1,309 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"cli",
+				"client\tstatement"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"contents": "var jsonQ = require(\"jsonq\");\nvar jdata = require(\"./Beauty-feed-filtered-base\");\nvar fdata = require(\"./Fnames\");\n\nvar jkey = \"Additional Product Picture 4\";\n\nconsole.log(jdata[7][jkey])\n\nconsole.log(\"Finished\")\n\n \n\n//console.log(Object.keys(jdata[7]));\n//console.log(Object.values(jdata[7]));\n\n\n",
+			"file": "jtest.js",
+			"file_size": 315,
+			"file_write_time": 132299794334628622,
+			"settings":
+			{
+				"buffer_size": 297,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "Fnames.json",
+			"settings":
+			{
+				"buffer_size": 876,
+				"encoding": "UTF-8",
+				"line_ending": "Unix",
+				"name": "[Product ID]\t[Model] [Code]\t[Full Product Name]\t[S"
+			}
+		},
+		{
+			"contents": " /*\n *jsonQ.js v 1.2.0\n *Author: Sudhanshu Yadav\n *s-yadav.github.com\n *Copyright (c) 2013 - 2016 Sudhanshu Yadav.\n *MIT licenses\n */\n//initialize jsonQ\n;(function(factory) {\n    /** support UMD ***/\n    var global = Function('return this')() || (42, eval)('this');\n    if (typeof define === \"function\" && define.amd) {\n        define([\"jsonq\"], function($) {\n            return (global.jsonQ = factory());\n        });\n    } else if (typeof module === \"object\" && module.exports) {\n        module.exports = factory();\n\n    } else {\n        global.jsonQ = factory();\n    }\n}(function(undefined) {\n\n    var jsonQ = function(json) {\n        //return a jsonQ object\n        return new jsonQ.fn.init(json);\n    },\n        //plugin variable and methods\n        error = function(msg) {\n            throw msg;\n        },\n        stringify = JSON.stringify,\n        parse = JSON.parse;\n\n    //global settings\n    jsonQ.settings = {\n        sort: {\n            \"order\": \"ASC\",\n            \"logic\": function(val) {\n                return val;\n            },\n            \"caseIgnore\": true,\n            \"allLevel\": true //to sort all level if true and if false only lowest level\n        }\n    };\n\n    /*****private functions for internal use only*******/\n\n    //to check weather path b is subset of path a\n    function matchPath(a, b) {\n        var regex = new RegExp('^' + a.join('~~'), 'i');\n        return regex.test(b.join('~~'));\n    }\n\n    //function to create new format\n    function newFormat(option) {\n        //parameter change\n        var keyAdded = option.keyAdded || [],\n            json = option.json,\n            path = option.path,\n            newJson = option.newJson;\n        //add to new json\n\n        jsonQ.each(json, function(k, val) {\n            var lvlpath = path ? JSON.parse(JSON.stringify(path)) : [];\n            lvlpath.push(k);\n\n            //to add a new direct access for each key in json so we get the path of that key easily\n            if (objType(json) == 'object') {\n                if (keyAdded.indexOf(k) == -1) {\n                    keyAdded.push(k);\n                    newJson.jsonQ_path[k] = [];\n                }\n\n                newJson.jsonQ_path[k].push({\n                    path: lvlpath\n                });\n            }\n            //if value is json or array go to further level\n            var type = objType(val);\n            if (type == 'object' || type == 'array') {\n                newFormat({\n                    'json': val,\n                    'newJson': newJson,\n                    'path': lvlpath,\n                    'keyAdded': keyAdded\n                });\n            }\n\n\n        });\n\n        return newJson;\n    }\n\n    //traverse functions\n    var tFunc = {\n        //search on top level\n        topLevel: function(option) {\n            var current = this.jsonQ_current,\n                newObj = this.cloneObj(jsonQ()),\n                newCurrent = newObj.jsonQ_current = [],\n                prevPathStr = '',\n                key = option.key,\n                method = option.method;\n\n            for (var i = 0, ln = current.length; i < ln; i++) {\n                var pathC = current[i].path,\n                    pathStr,\n                    outofBound = false,\n                    parPath = pathC.concat([]);\n\n                //to run callback to apply top traverse logic\n                if (method == 'parent') {\n                    if (parPath.length === 0) {\n                        outofBound = true;\n                    } else {\n                        parPath.pop();\n                    }\n                } else {\n                    var keyIndex = parPath.lastIndexOf(key);\n                    if (keyIndex == -1) {\n                        outofBound = true;\n                    } else {\n                        parPath = parPath.slice(0, keyIndex + 1);\n                    }\n                }\n\n                pathStr = JSON.stringify(parPath);\n\n                if (prevPathStr != pathStr && !outofBound) {\n                    newCurrent.push({\n                        path: parPath\n                    });\n                }\n\n                prevPathStr = pathStr;\n            }\n\n            //set other definition variables\n            newObj.length = newCurrent.length;\n            //to add selector\n            newObj.selector.push({\n                method: method,\n                key: key\n            });\n\n            return newObj;\n        },\n        //traverse which have qualifiers mainly on bottom and sibling method\n        qualTrv: function(option) {\n            var current = this.jsonQ_current,\n                newObj = this.cloneObj(jsonQ()),\n                newCurrent = newObj.jsonQ_current = [],\n                pathObj = this.jsonQ_path,\n\n                //key element (an array of paths with following key)\n                key = option.key,\n                //dont work with original object clone it and if undefined than make as empty array\n                elm = jsonQ.clone(pathObj[key]) || [],\n                //qualifier\n                qualifier = option.qualifier,\n                qType = objType(qualifier),\n                //travese method\n                method = option.method,\n                find = method == \"find\" ? true : false;\n\n            for (var i = 0, ln = current.length; i < ln; i++) {\n                var pathC = current[i].path,\n                    pathCTemp = [],\n                    found = false;\n\n\n                if (!find) {\n                    //if it is top level continue the loop. This case comes when we do sibling method called on initial object\n                    if (pathC.length === 0) {\n                        continue;\n                    }\n\n                    pathCTemp = pathC.concat([]);\n                    pathCTemp.pop();\n                }\n\n                //make a loop on element to match the current path and element path\n                for (var j = 0; j < elm.length; j++) {\n                    var pathE = elm[j].path,\n                        condition;\n                    if (find) {\n                        condition = matchPath(pathC, pathE);\n                    } else {\n                        var pathETemp = pathE.concat([]);\n                        //to pop last element\n                        pathETemp.pop();\n                        condition = pathCTemp.join() == pathETemp.join();\n                    }\n\n                    if (condition) {\n                        //code to check qualifier need to be written this on is only when quantifier when it is function in other case it will be applied on last\n\n                        var qTest = tFunc.qTest.call(this, qType, qualifier, pathE, newCurrent);\n\n                        if (qTest) {\n                            //to remove element which is already added\n                            elm.splice(j, 1);\n                            j--;\n                        }\n\n                        //make found flag true\n                        found = true;\n                    }\n                    //break if path doesent match in next sequence and for one element is already there.\n                    else if (found) {\n                        break;\n                    }\n                }\n            }\n\n            //to apply qualifier if it is string . its mainly for array kind of qualifier\n            if (qType == \"string\") {\n                newObj = this.filter.call(newObj, qualifier);\n            }\n\n            //set other defination variables\n            newObj.length = newObj.jsonQ_current.length;\n\n            //to add selector\n            newObj.selector.push({\n                method: method,\n                key: key,\n                qualifier: qualifier\n            });\n\n\n            return newObj;\n        },\n        qTest: function(qType, qualifier, path, array) {\n            var qTest = qType == 'function' ? qualifier.call(this.pathValue(path)) : qType == 'object' ? jsonQ.checkKeyValue(this.pathValue(path), qualifier) : true;\n\n            //if it is key value pair than also we can check here.\n            if (qTest) {\n                array.push({\n                    path: path\n                });\n            }\n            return qTest;\n        }\n\n    };\n\n    //functions involved on sorting\n    var sortFunc = {\n        baseConv: function(type, val, settings) {\n            if (type == 'string') {\n                if (settings.caseIgnore) {\n                    return val.toLowerCase();\n                }\n            } else if (type == 'array') {\n                return val.join();\n            } else if (type == 'object') {\n                return stringify(jsonQ.order(val));\n            }\n\n            return val;\n        },\n        sortAry: function(array, logic, settings) {\n            array.sort(function(a, b) {\n                var compA = logic(a);\n                var compB = logic(b);\n                return (compA < compB) ? -1 : (compA > compB) ? 1 : 0;\n            });\n\n            //to display on descending order\n            if (settings.order.toLowerCase() == \"desc\") {\n                array.reverse();\n            }\n            return array;\n        }\n    };\n\n    jsonQ.fn = jsonQ.prototype = {\n        init: function(json) {\n            var type;\n\n            //to return if no parameter is passed\n\n            if (!json) return this;\n\n            type = objType(json);\n            if (type == 'string') {\n                try {\n                    json = JSON.parse(json);\n                } catch (e) {\n                    error('Not a valid json string.');\n                }\n            } else if (type != 'object' && type != 'array') {\n                error('Not a valid json object.');\n                return json;\n            }\n\n            //to set initial values\n            this.jsonQ_root = json;\n            this.jsonQ_path = {};\n            this.jsonQ_current = [{\n                path: []\n            }];\n\n            //to get other keys\n            newFormat({\n                json: json,\n                newJson: this,\n                refresh: true\n            });\n\n            //set jsonQ definition variables\n            this.length = this.jsonQ_current.length;\n            this.selector = [];\n\n            return this;\n\n        },\n\n        //to get value at specific path from root\n        pathValue: function(path) {\n            return jsonQ.pathValue(this.jsonQ_root, path);\n        },\n        setPathValue: function(path, value) {\n            jsonQ.setPathValue(this.jsonQ_root, path, value);\n            return this;\n        },\n        clone: function() {\n            return parse(stringify(this.jsonQ_current));\n        },\n        cloneObj: function(newObj) {\n            var obj = this;\n\n            newObj = newObj || {};\n\n            jsonQ.each(obj, function(k, v) {\n                newObj[k] = v;\n            });\n\n            //to make a different copy of selector otherwise selector will be same on all object.\n            newObj.selector = jsonQ.merge([], newObj.selector);\n\n            return newObj;\n        },\n        value: function(value, clone) {\n            var json = this.jsonQ_current;\n\n\n            clone = clone === false ? false : true;\n\n            //to return value if called as getter (ie value is undefined)\n            if (!value) {\n                var newArray = [];\n                //create a new set of values\n                this.each(function(idx, path, val) {\n                    newArray.push(val);\n                });\n\n                return newArray;\n            }\n            //value as setter. value can be the exact value which you want to set or can be a callback. In callback pathValue will be first argument.\n            else {\n                var type = objType(value);\n                for (var i = 0, ln = json.length; i < ln; i++) {\n                    var path = json[i].path,\n                        val;\n                    if (type == 'function') {\n                        var prevVal = this.pathValue(path);\n                        val = clone ? jsonQ.clone(value(prevVal)) : value(prevVal);\n                    } else {\n                        val = clone ? jsonQ.clone(value) : value;\n                    }\n                    //to set value on json\n                    this.setPathValue(path, val);\n                }\n\n                return this;\n            }\n\n        },\n        //clone parameter is for if you want to append any object so append exact object or create clone of object and append\n        //to append in last of values of current\n        append: function(valObj, clone) {\n            return this.appendAt(\"last\", valObj, clone);\n        },\n        //to append in first of values of current\n        prepend: function(valObj, clone) {\n            return this.appendAt(\"first\", valObj, clone);\n        },\n        //to append at specific index of values of current\n        appendAt: function(index, valObj, clone) {\n            var current = this.jsonQ_current;\n            //return if incorrect index is given\n            if (isNaN(index) && index != \"first\" && index != \"last\") {\n                error(index + 'is not a valid index.');\n                return this;\n            }\n\n            for (var i = 0, ln = current.length; i < ln; i++) {\n                var pathC = current[i].path.concat([]),\n                    lastKey = pathC.pop(),\n                    parRef = this.pathValue(pathC),\n                    type = objType(parRef[lastKey]),\n                    objLn = parRef[lastKey].length;\n\n\n                //to limit index\n                var idx = index < 0 || index == \"first\" ? 0 : index > objLn || index == \"last\" ? objLn : index;\n\n\n                //if array push\n                if (type == 'array') {\n                    valObj = clone ? jsonQ.clone(valObj) : valObj;\n\n                    parRef[lastKey].splice(idx, 0, valObj);\n                }\n\n                //if string concatenate , if number add\n                else if (type == 'string') {\n                    var str = parRef[lastKey];\n                    parRef[lastKey] = str.substring(0, idx) + valObj + str.substring(idx, objLn);\n                }\n\n\n            }\n            return this;\n\n        },\n        filter: function(qualifier) {\n            var current = this.jsonQ_current,\n                newObj = this.cloneObj(jsonQ()),\n                newCurrent = newObj.jsonQ_current = [],\n                qType = objType(qualifier);\n\n            if (!qualifier) return this;\n\n            for (var i = 0, ln = current.length; i < ln; i++) {\n                var pathC = current[i].path;\n\n                //code to check qualifier need to be written this on is only when quantifier when it is function or json in other case it will be applied on last\n                tFunc.qTest.call(this, qType, qualifier, pathC, newCurrent);\n            }\n\n            //to apply qualifier if it is string . its mainly for array kind of qualifier\n            if (qType == 'string') {\n                //to check string for nth and eq\n                var regex = /(nth|eq)\\((.+)\\)/,\n                    matched = regex.exec(qualifier);\n                if (matched) {\n                    newCurrent = jsonQ.nthElm(current, matched[2], true);\n                } else {\n                    newCurrent = jsonQ.nthElm(current, qualifier, true);\n                }\n                //to store it back on newObj\n                newObj.jsonQ_current = newCurrent;\n            }\n\n            //set other definition variables\n            newObj.length = newCurrent.length;\n\n            //to add selector\n            newObj.selector.push({\n                method: 'filter',\n                qualifier: qualifier\n            });\n\n            return newObj;\n\n        },\n        //first argument is key in which you want to search, second key is qualifier of it.\n        find: function(key, qualifier) {\n            return tFunc.qualTrv.call(this, {\n                method: \"find\",\n                key: key,\n                qualifier: qualifier\n            });\n        },\n        sibling: function(key, qualifier) {\n            return tFunc.qualTrv.call(this, {\n                method: \"sibling\",\n                key: key,\n                qualifier: qualifier\n            });\n        },\n        parent: function() {\n            return tFunc.topLevel.call(this, {\n                method: \"parent\"\n            });\n        },\n        closest: function(key) {\n            return tFunc.topLevel.call(this, {\n                method: \"closest\",\n                key: key\n            });\n        },\n        //return path of first element found through selector\n        path: function() {\n            return this.jsonQ_current[0].path;\n        },\n        //some time we can only return the value of the first element in current\n        firstElm: function() {\n            return this.pathValue(this.jsonQ_current[0].path);\n        },\n        lastElm: function() {\n            return this.pathValue(this.jsonQ_current[this.length - 1].path);\n        },\n        nthElm: function(pattern, arrayReturn) {\n            return jsonQ.nthElm(this.value(), pattern, arrayReturn);\n        },\n        index: function(elm, isQualifier) {\n            return jsonQ.index(this.value(), elm, isQualifier);\n        },\n        createXML: function() {\n            return jsonQ.createXML(this.value());\n        },\n\n\n        //function to sort array objects\n        sort: function(key, settings) {\n            //merge global setting with local setting\n            settings = jsonQ.merge({}, jsonQ.settings.sort, settings);\n            var jobj = this.find(key),\n                current = jobj.clone(),\n                sortStack = [],\n                i, ln,\n                sortedPath = [],\n                type = objType(jobj.pathValue(current[0].path)),\n                //function to get value which is an array from pathKey traversing from right.\n                getClosestArray = function(key) {\n                    while (key.length !== 0) {\n                        var lastKey = key.pop();\n                        if (!isNaN(lastKey)) {\n                            var val = jobj.pathValue(key);\n                            if (objType(val) == 'array') {\n                                return val;\n                            }\n                        }\n                    }\n                    return null;\n                };\n\n            //initialize sort stack\n            for (i = 0, ln = current.length; i < ln; i++) {\n                sortStack.push({\n                    pathHolder: current[i].path.concat([]),\n                    current: current[i].path.concat([])\n                });\n            }\n\n            //to run the loop until all are sorted\n            var alpha = 0,\n\n                // function to remove element if sorting is done for that path\n                spliceElm = function(i) {\n                    sortStack.splice(i, 1);\n                    return --i;\n                };\n            while (sortStack.length !== 0) {\n                alpha++;\n                for (i = 0; i < sortStack.length; i++) {\n                    var cur = sortStack[i].current,\n                        pH = sortStack[i].pathHolder,\n                        //to get the closest array in the current path. This will also change value of current path variable.\n                        ary = getClosestArray(cur),\n                        pathStr = cur.join();\n\n\n\n                    //to remove from sort stack if no array is left on key or if that is already sorted\n                    if (cur.length === 0 || sortedPath.indexOf(pathStr) != -1) {\n                        i = spliceElm(i);\n                    }\n\n                    //to sort if array found\n                    else {\n                        //logic path is path which we add in on condition to find the element value according to which we are sorting\n                        var logicPath = pH.slice(cur.length + 1, pH.length),\n\n                            logic = function(a) {\n                                var val = jsonQ.pathValue(a, logicPath);\n\n                                //to convert val to be compared\n                                val = sortFunc.baseConv(type, val, settings);\n                                return settings.logic(val);\n                            };\n\n                        //to sort the root json\n                        sortFunc.sortAry(ary, logic, settings);\n\n                        //if multilevel sort is true\n                        if (settings.allLevel) {\n                            //to maintain the path which is already sorted and change pathHolder to point first element of sorted array\n                            pH[cur.length] = 0;\n                            sortedPath.push(pathStr);\n                        } else {\n                            //remove sorted path\n                            i = spliceElm(i);\n                        }\n                    }\n\n\n\n                }\n            }\n\n\n            return jsonQ(jobj.jsonQ_root).find(key);\n        },\n        //to make loop on current\n        each: function(callback) {\n            var current = this.jsonQ_current;\n            for (var i = 0, ln = current.length; i < ln; i++) {\n                callback(i, current[i].path, this.pathValue(current[i].path));\n            }\n            return this;\n        },\n        //to return unique value of current\n        unique: function() {\n            return jsonQ.unique(this.value());\n        },\n        refresh: function() {\n            var selector = this.selector;\n\n            var jObj = jsonQ(this.jsonQ_root);\n            for (var i = 0, ln = selector.length; i < ln; i++) {\n                var curSel = selector[i],\n                    args = [];\n\n                if (curSel.key) args.push(curSel.key);\n                if (curSel.qualifier) args.push(curSel.qualifier);\n\n                jObj = jObj[curSel.method].apply(jObj, args);\n            }\n\n            //to store value back on this\n            this.cloneObj.call(jObj, this);\n\n            return this;\n        },\n        prettify: function(htmlReturn) {\n            return jsonQ.prettify(this.value(), htmlReturn);\n        }\n    };\n\n    //super exposed functions\n    //jsonQ each\n    jsonQ.each = function(json, callback) {\n        for (var key in json) {\n            if (json.hasOwnProperty(key)) {\n                callback(key, json[key]);\n            }\n        }\n    };\n\n    //to find object type of any object\n    var objType = jsonQ.objType = (function() {\n        var map = {\n            '[object Array]': 'array',\n            '[object Object]': 'object',\n            '[object String]': 'string',\n            '[object Number]': 'number',\n            '[object Boolean]': 'boolean',\n            '[object Null]': 'null',\n            '[object Function]': 'function'\n        };\n\n        return function(obj) {\n            var type = Object.prototype.toString.call(obj);\n            return map[type];\n        };\n    }());\n\n    //to merge all the objects in argument to the first argument.\n    //idea taken by jquery extend.\n\n    //deep parameter is required if a person want to merge a json in all level recursively\n    jsonQ.merge = function() {\n        var arg = arguments,\n            deepType = objType(arg[0]),\n            i = 1,\n            ln = arg.length,\n            deep = false,\n            target = arg[0];\n        if (ln === 0 || (deepType == \"boolean\" && ln == 1)) {\n            return;\n        }\n        //to get the target object where all merge will be done\n        if (deepType == \"boolean\") {\n            target = arg[1];\n            i = 2;\n            deep = arg[0];\n        }\n\n        //callback function to recursiveliy merge\n        var eachCallback = function(k, v) {\n            var type = objType(v),\n                tarType = objType(target[k]);\n\n            if (deep && (type == \"array\" || type == \"object\")) {\n                target[k] = type == tarType && (tarType == \"array\" || tarType == \"object\") ? target[k] : type == \"array\" ? [] : {};\n\n                //to merge recursively\n                jsonQ.merge(deep, target[k], v);\n            } else {\n                target[k] = v;\n            }\n        };\n\n        for (; i < ln; i++) {\n\n            jsonQ.each(arg[i], eachCallback);\n        }\n        return target;\n    };\n\n    jsonQ.merge(jsonQ, {\n        sort: function(ary, settings) {\n            settings = jsonQ.merge({}, jsonQ.settings.sort, settings);\n\n            if (objType(ary) != 'array') {\n                error('Only array is allowed to sort');\n                return;\n            }\n\n            var convLogic = function(val) {\n\n                var type = objType(val);\n                val = sortFunc.baseConv(type, val, settings);\n\n                return settings.logic(val);\n            };\n\n            //to return sorted array\n            return sortFunc.sortAry(ary, convLogic, settings);\n        },\n        order: function(json) {\n\n            //to return if json type is not an object type\n            if (typeof json != 'object') {\n                return json;\n            }\n\n            var logic = function(val) {\n                //if a json is an array alike and keys are numbers as string type (\"1\",\"2\" instead of 1,2) convert them to integer.\n                if (!isNaN(val)) val = parseInt(val);\n                return val;\n            },\n\n                func = function(jsonVal) {\n                    var jsonType = objType(jsonVal),\n                        keys = Object.keys(jsonVal);\n\n                    if (jsonType == 'object') {\n                        keys.sort(function(a, b) {\n                            var compA = logic(a);\n                            var compB = logic(b);\n                            return (compA < compB) ? -1 : (compA > compB) ? 1 : 0;\n                        });\n                    }\n                    //to order\n                    for (var i = 0, ln = keys.length; i < ln; i++) {\n                        var key = keys[i],\n                            val = jsonVal[key],\n                            type = objType(val);\n\n                        //to go to next level if value is json type\n                        if (type == 'object' || type == \"array\") {\n                            func(val);\n                        }\n\n                        //to order\n                        if (jsonType == 'object') {\n                            delete jsonVal[key];\n                            jsonVal[key] = val;\n                        }\n                    }\n                };\n\n            //initialize\n            func(json);\n\n            return json;\n        },\n        clone: function(json) {\n            var type = objType(json);\n            return type == 'object' || type == 'array' ? parse(stringify(json)) : json;\n        },\n        //to find index of an element in set of element\n        index: function(list, elm, isQualifier) {\n            var type = objType(elm),\n                ln = list.length,\n                //check that elm is a object or not that is taken by reference\n                refObj = type == \"object\" || type == \"array\" || type == \"function\" ? true : false;\n\n\n            //if elm is a function consider it as a qualifier\n            if (type == \"function\") {\n                isQualifier = true;\n            }\n\n            if (refObj && !isQualifier) {\n                //convert object to string so that they can be compared.\n                var jsonStr = stringify(jsonQ.order(elm));\n            }\n\n            for (var i = 0; i < ln; i++) {\n                var cur = list[i];\n                if (refObj) {\n                    var lType = objType(cur);\n                    if (lType != type && !isQualifier) continue;\n\n                    //to compare\n                    if (!isQualifier) {\n                        if (stringify(jsonQ.order(cur)) == jsonStr) {\n                            return i;\n                        }\n\n                        //if element is a qualifier\n                    } else {\n                        var test;\n                        if (type == 'function') {\n                            test = elm.call(cur);\n                        } else if (type == \"object\" && lType == \"object\") {\n                            test = jsonQ.checkKeyValue(cur, elm);\n                        } else if (lType == \"array\") {\n                            if (type == \"array\") {\n                                for (var j = 0, elmLn = elm.length; j < elmLn; j++) {\n                                    test = jsonQ.index(cur, elm[j]) != -1;\n                                    if (!test) break;\n                                }\n                            } else {\n                                test = jsonQ.index(cur, elm) != -1;\n                            }\n                        }\n\n                        //return index if it passes the test\n                        if (test) return i;\n\n                    }\n\n                } else if (elm == cur) {\n                    return i;\n                }\n            }\n            return -1;\n        },\n        //to check an array contains a specific element or not . an element can be array or json.\n        contains: function(array, elm, isQualifier) {\n            return jsonQ.index(array, elm, isQualifier) != -1;\n        },\n        //function to check an json object contains a set of key value pair or not\n        checkKeyValue: function(json, keyVal) {\n            for (var k in keyVal) {\n                if (keyVal.hasOwnProperty(k))\n                    if (!jsonQ.identical(keyVal[k], json[k])) return false;\n            }\n            return true;\n        },\n\n        nthElm: function(array, arg, aryReturn) {\n            var result;\n            if (array[arg]) {\n                result = array[arg];\n            } else if (arg == 'last') {\n                result = array[array.length - 1];\n            } else if (arg == 'first') {\n                result = array[0];\n            } else if (arg == 'random') {\n                var rand = Math.floor(Math.random() * array.length);\n                result = array[rand];\n            } else if (arg == 'even') {\n                result = jsonQ.nthElm(array, '2n');\n            } else if (arg == 'odd') {\n                result = jsonQ.nthElm(array, '2n+1');\n            }\n            //to return sequence\n            else {\n                try {\n                    var newArray = [],\n                        ln = array.length;\n\n                    if (!arg.match(/^[0-9n*+-\\/]+$/)) throw ('');\n\n                    arg = arg.replace(/([0-9])n/g, function($0, $1) {\n                        return $1 ? $1 + '*n' : $0;\n                    });\n\n\n\n                    for (var n = 0; n < ln; n++) {\n                        var index = eval(arg);\n                        if (index > ln - 1) {\n                            break;\n                        }\n                        newArray.push(array[index]);\n                    }\n                    result = newArray;\n                } catch (error) {\n                    //if no correct option return whole array\n                    result = array;\n                }\n            }\n            result = result || array;\n            return objType(result) != 'array' && aryReturn ? [result] : result;\n        },\n        prettify: function(obj, htmlReturn) {\n\n            if (typeof obj != 'object') {\n                throw ('Only valid json object is allowed.');\n            }\n\n            //to return prettified. If htmlReturn false add 3 spaces else add &nbsp;\n            if (htmlReturn) {\n                return JSON.stringify(obj, null, '\\t').replace(/\\n/g, '</br>').replace(/\\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');\n            }\n            return JSON.stringify(obj, null, 3);\n\n        },\n\n        //need to modify it little bit\n        //By Chris O'Brien, prettycode.org\n        identical: function(a, b) {\n\n            function sort(object) {\n                if (typeof object !== \"object\" || object === null) {\n                    return object;\n                }\n\n                return Object.keys(object).sort().map(function(key) {\n                    return {\n                        key: key,\n                        value: sort(object[key])\n                    };\n                });\n            }\n\n            return JSON.stringify(sort(a)) === JSON.stringify(sort(b));\n        },\n        //Return the union of arrays in new array\n        union: function() {\n            var arg = arguments,\n                target = [],\n                ln = arg.length;\n\n            for (var i = 0; i < ln; i++) {\n                var aryLn = arg[i].length;\n                for (var j = 0; j < aryLn; j++) {\n                    var itm = arg[i][j];\n                    if (jsonQ.index(target, itm) == -1) {\n                        target.push(itm);\n                    }\n                }\n\n            }\n            return target;\n        },\n        //return intersection of array in new array\n        intersection: function() {\n            var arg = arguments,\n                target = [],\n                flag,\n                ln = arg.length;\n\n            if (ln == 1) {\n                target = arg[0];\n            } else {\n                for (var j = 0, aryLn = arg[0].length; j < aryLn; j++) {\n                    var elm = arg[0][j];\n                    flag = 1;\n                    for (var i = 1; i < ln; i++) {\n                        if (jsonQ.index(arg[i], elm) == -1) {\n                            flag = 0;\n                            break;\n                        }\n                    }\n                    if (flag == 1) {\n                        target.push(elm);\n                    }\n\n                }\n            }\n            return target;\n        },\n        //shuffle the order of elements in a array. returns the same array.\n        shuffle: function(array) {\n            for (var i = 1, ln = array.length; i < ln; i++) {\n                var j = Math.floor(Math.random() * (i + 1)),\n                    tmp = array[i];\n                array[i] = array[j];\n                array[j] = tmp;\n            }\n\n            return array;\n        },\n        suffle: function(array) {\n            console.error('This method is deprecated. It was originally a miss spell of shuffle. Use jsonQ.shuffle instead.')\n            jsonQ.shuffle(array);\n        },\n        //return a new array list of unique(distinct) elements of an array\n        unique: function(array) {\n            var ln = array.length,\n                newAry = [];\n            for (var i = 0; i < ln; i++) {\n                if (jsonQ.index(newAry, array[i]) == -1) {\n                    newAry.push(array[i]);\n                }\n            }\n            return newAry;\n        },\n        //to get value at specific path in a json\n        pathValue: function(json, path) {\n            var i = 0,\n\n                ln = path.length;\n\n            if (json === null) {\n                return null;\n            }\n            while (i < ln) {\n                if (json[path[i]] === null) {\n                    json = null;\n                    return;\n                } else {\n                    json = json[path[i]];\n                }\n                i = i + 1;\n            }\n            return json;\n        },\n        setPathValue: function(json, path, value) {\n            var i = 0,\n                tempJson = json,\n                ln = path.length;\n            if (json === null) {\n                return null;\n            }\n            while (i < ln) {\n                if (typeof tempJson[path[i]] != 'object') {\n                    tempJson[path[i]] = objType(path[i + 1]) == 'number' ? [] : {};\n                }\n                if (i == path.length - 1) {\n                    tempJson[path[i]] = value;\n                }\n                tempJson = tempJson[path[i]];\n                i = i + 1;\n            }\n            return json;\n        },\n        createXML: function(json) {\n            var jsonToXML = function(json, xmlAry) {\n                xmlAry = xmlAry || [];\n                var start = xmlAry.length === 0 ? true : false,\n                    type = objType(json);\n                if (start) {\n                    xmlAry.push('<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><jsonXML>');\n                }\n\n                //to make loop on array or object;\n                jsonQ.each(json, function(k, val) {\n                    var tag = type == 'array' ? 'arrayItem' : k,\n                        elmType = objType(val);\n                    xmlAry.push('<' + tag + ' type=\"' + elmType + '\">');\n                    if (elmType == 'object' || elmType == 'array') {\n                        jsonToXML(val, xmlAry);\n                    } else {\n                        xmlAry.push('<![CDATA[' + val + ']]>');\n\n                    }\n                    xmlAry.push('</' + tag + '>');\n                });\n\n\n                if (start) {\n                    xmlAry.push('</jsonXML>');\n                    return xmlAry.join('');\n                } else {\n                    return xmlAry;\n                }\n\n            };\n            return jsonToXML(json);\n        },\n        //append functions\n\n        //to append in last of values of array or string\n        append: function(target, val, clone) {\n            return jsonQ.appendAt(target, \"last\", val, clone);\n        },\n        //to append in first of values of array or string\n        prepend: function(target, val, clone) {\n            return jsonQ.appendAt(target, \"first\", val, clone);\n        },\n        //to append at specific index of values of array or string\n        appendAt: function(target, index, val, clone) {\n\n            if (isNaN(index) && index != \"first\" && index != \"last\") {\n                error(index + 'is not a valid index.');\n                return;\n            }\n\n            var type = objType(target),\n                length = target.length;\n\n            //to limit index\n            var idx = index < 0 || index == \"first\" ? 0 : index > length || index == \"last\" ? length : index;\n\n\n            //if array push\n            if (type == 'array') {\n                val = clone ? jsonQ.clone(val) : val;\n                target.splice(idx, 0, val);\n            }\n\n            //if string concatenate , if number add\n            else if (type == 'string') {\n                target = target.substring(0, idx) + val + target.substring(idx, length);\n            }\n\n\n            return target;\n\n        }\n\n    });\n\n    //to assign jsonQ prototypes to init function\n    jsonQ.fn.init.prototype = jsonQ.fn;\n\n    return jsonQ;\n}));\n",
+			"file": "node_modules/jsonq/jsonQ.js",
+			"file_size": 38434,
+			"file_write_time": 121436361000000000,
+			"settings":
+			{
+				"buffer_size": 38435,
+				"line_ending": "Unix"
+			}
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"Package Control: ",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 150.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/home/rootwzrd/Documents/jsonq-test"
+	],
+	"file_history":
+	[
+		"/home/rootwzrd/Desktop/lnks.txt",
+		"/home/rootwzrd/.config/sublime-text-3/Packages/Anaconda/Anaconda.sublime-settings",
+		"/home/rootwzrd/.config/sublime-text-3/Packages/User/Plain text.sublime-settings",
+		"/home/rootwzrd/.config/sublime-text-3/Packages/Package Control/Package Control.sublime-settings",
+		"/home/rootwzrd/.config/sublime-text-3/Packages/User/Package Control.sublime-settings",
+		"/home/rootwzrd/src/newvue/newvue/public/test.html"
+	],
+	"find":
+	{
+		"height": 26.0
+	},
+	"find_in_files":
+	{
+		"height": 0.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"[",
+			"]",
+			"]\"",
+			", ",
+			"]",
+			"["
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"selected": 0,
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": "jtest.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 297,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								296,
+								296
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/JavaScript/JavaScript.sublime-syntax",
+							"word_separators": "./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				},
+				{
+					"buffer": 1,
+					"file": "Fnames.json",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 876,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								876,
+								876
+							]
+						],
+						"settings":
+						{
+							"auto_name": "[Product ID]\t[Model] [Code]\t[Full Product Name]\t[S",
+							"syntax": "Packages/JavaScript/JSON.sublime-syntax"
+						},
+						"translation.x": 5582.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "node_modules/jsonq/jsonQ.js",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 38435,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1,
+								1
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/JavaScript/JavaScript.sublime-syntax",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
+						},
+						"translation.x": 0.0,
+						"translation.y": 1326.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				}
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 26.0
+	},
+	"input":
+	{
+		"height": 38.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 120.0
+	},
+	"pinned_build_system": "",
+	"project": "tJSON.sublime-project",
+	"replace":
+	{
+		"height": 48.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 255.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
